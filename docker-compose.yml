@@ -1,0 +1,15 @@
+services:
+  monitor:
+    build: .
+    container_name: viewstats-monitor
+    init: true
+    env_file: .env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - cache_vol:/app/.cache
+      - /Users/yangjunjie/workspace/pyviewstats/logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  cache_vol:
