@@ -6,7 +6,6 @@ hashing the top-5 video IDs.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 from datetime import datetime
@@ -20,8 +19,6 @@ if TYPE_CHECKING:
     import diskcache
 
 logger = logging.getLogger(__name__)
-
-_DEDUP_TTL = 12 * 3600  # 12 hours
 
 
 def _fmt_views_cn(n: int) -> str:
@@ -185,12 +182,6 @@ class FeishuNotifier:
         self._webhook_url = webhook_url
         self._cache = cache
 
-    def _compute_hash(self, result: RankingResult) -> str:
-        """Hash of top-5 video IDs from both categories for dedup."""
-        ids = [e.video_id for e in result.long_videos[:5]]
-        ids.extend(e.video_id for e in result.short_videos[:5])
-        return hashlib.md5("|".join(ids).encode()).hexdigest()
-
     async def send_ranking_card(
         self,
         result: RankingResult,
@@ -203,14 +194,7 @@ class FeishuNotifier:
         dur_known: int = 0,
         source_url: str = "",
     ) -> None:
-        """Build and send the ranking card. Skips if content unchanged."""
-        content_hash = self._compute_hash(result)
-        cache_key = "feishu:last_push_hash"
-
-        if self._cache.get(cache_key) == content_hash:
-            logger.info("Skip sending Feishu card: content unchanged (hash=%s)", content_hash)
-            return
-
+        """Build and send the ranking card."""
         payload = _build_card_payload(
             result,
             category_name=category_name,
@@ -222,7 +206,7 @@ class FeishuNotifier:
             source_url=source_url,
         )
 
-        logger.info("Sending Feishu card (hash=%s)", content_hash)
+        logger.info("Sending Feishu card")
 
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
@@ -250,4 +234,3 @@ class FeishuNotifier:
                     raise
 
             logger.info("Feishu card sent successfully: %s", body[:200])
-            self._cache.set(cache_key, content_hash, expire=_DEDUP_TTL)
