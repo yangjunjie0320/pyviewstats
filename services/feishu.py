@@ -207,6 +207,10 @@ class FeishuNotifier:
         content_hash = self._compute_hash(result)
         cache_key = "feishu:last_push_hash"
 
+        if self._cache.get(cache_key) == content_hash:
+            logger.info("Skip sending Feishu card: content unchanged (hash=%s)", content_hash)
+            return
+
         payload = _build_card_payload(
             result,
             category_name=category_name,
@@ -234,6 +238,16 @@ class FeishuNotifier:
                 raise RuntimeError(
                     f"Feishu webhook error: HTTP {resp.status_code}: {body[:500]}"
                 )
+
+            try:
+                resp_json = resp.json()
+                code = resp_json.get("code")
+                if code is not None and code != 0:
+                    logger.error("Feishu API returned error: %s", body[:500])
+                    raise RuntimeError(f"Feishu API error: {body[:500]}")
+            except Exception as e:
+                if isinstance(e, RuntimeError):
+                    raise
 
             logger.info("Feishu card sent successfully: %s", body[:200])
             self._cache.set(cache_key, content_hash, expire=_DEDUP_TTL)
