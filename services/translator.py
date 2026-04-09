@@ -77,17 +77,7 @@ class GeminiTranslator:
                         _cache_key(entries[idx].title), translation, expire=_CACHE_TTL
                     )
             except Exception:
-                logger.warning(
-                    "Gemini translation failed, falling back to Google Translate",
-                    exc_info=True,
-                )
-                # Fall back to GoogleTranslator for remaining
-                fallback = GoogleTranslator(self._cache)
-                fallback_entries = [entries[i] for i in uncached_indices]
-                translated = await fallback.translate_entries(fallback_entries)
-                for idx, entry in zip(uncached_indices, translated):
-                    if entry.translated_title:
-                        cached_translations[idx] = entry.translated_title
+                logger.error("Gemini translation failed for batch", exc_info=True)
 
         # Build result
         result = []
@@ -139,70 +129,3 @@ class GeminiTranslator:
             translations.extend([""] * (len(titles) - len(translations)))
 
         return translations[: len(titles)]
-
-
-class GoogleTranslator:
-    """Unofficial Google Translate endpoint via httpx.
-
-    Sequential with asyncio.sleep(0.5) between calls (rate limit guard).
-    Do NOT remove the sleep.
-    """
-
-    _BASE_URL = "https://translate.googleapis.com/translate_a/single"
-
-    def __init__(self, cache: diskcache.Cache) -> None:
-        self._cache = cache
-
-    async def translate_entries(self, entries: list[VideoEntry]) -> list[VideoEntry]:
-        """Translate titles sequentially with rate limiting."""
-        result = []
-        for entry in entries:
-            key = _cache_key(entry.title)
-            cached = self._cache.get(key)
-            if cached is not None:
-                result.append(replace(entry, translated_title=cached))
-                continue
-
-            translated = await self._translate_single(entry.title)
-            if translated:
-                self._cache.set(key, translated, expire=_CACHE_TTL)
-                result.append(replace(entry, translated_title=translated))
-            else:
-                logger.warning("Translation failed for: %s", entry.title[:50])
-                result.append(entry)
-
-            await asyncio.sleep(0.5)  # Rate limit guard — do NOT remove
-
-        return result
-
-    async def _translate_single(self, text: str) -> str | None:
-        """Translate a single text via unofficial Google endpoint."""
-        clean = text.replace("#", " ").replace("@", " ").replace("\n", " ").strip()
-        if not clean:
-            return None
-
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                resp = await client.get(
-                    self._BASE_URL,
-                    params={
-                        "client": "gtx",
-                        "sl": "auto",
-                        "tl": "zh-CN",
-                        "dt": "t",
-                        "q": clean,
-                    },
-                )
-                if resp.status_code != 200:
-                    logger.warning(
-                        "Google Translate returned %d for: %s",
-                        resp.status_code,
-                        clean[:50],
-                    )
-                    return None
-                data = resp.json()
-                return "".join(segment[0] for segment in data[0] if segment[0])
-        except Exception:
-            logger.warning("Google Translate request failed", exc_info=True)
-            return None
-

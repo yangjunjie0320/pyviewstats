@@ -20,7 +20,7 @@ from config import load_settings
 from models import RankingResult
 from services.feishu import FeishuNotifier
 from services.feishu_doc import FeishuDocArchiver
-from services.translator import GeminiTranslator, GoogleTranslator
+from services.translator import GeminiTranslator
 from services.video_registry import VideoRegistry
 from services.viewstats import ViewStatsClient
 from services.youtube import YouTubeDurationFetcher
@@ -48,13 +48,6 @@ CATEGORIES: dict[int, str] = {
     28: "Science & Technology",
     29: "Nonprofits & Activism",
 }
-
-
-def _make_translator(settings, cache):
-    """Select translation backend based on settings."""
-    if settings.translate_backend == "gemini":
-        return GeminiTranslator(settings.gemini_api_key, cache)
-    return GoogleTranslator(cache)
 
 
 async def main() -> None:
@@ -120,7 +113,7 @@ async def main() -> None:
     )
 
     # ── Step 5: Translate top N for daily card ────────────────────────
-    translator = _make_translator(settings, cache)
+    translator = GeminiTranslator(settings.gemini_api_key, cache)
 
     long_top = long_videos[:top_n]
     short_top = short_videos[:top_n]

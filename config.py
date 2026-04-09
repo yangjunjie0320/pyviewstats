@@ -21,8 +21,7 @@ class Settings:
     country: str
     interval: str
     duration_threshold_secs: int
-    translate_backend: str
-    gemini_api_key: str | None
+    gemini_api_key: str
     translate_top_n: int
     # Feishu SDK credentials (required)
     feishu_app_id: str
@@ -36,11 +35,9 @@ def load_settings() -> Settings:
     """Load settings from environment. Call once at startup."""
     load_dotenv()
 
-    translate_backend = os.environ.get("TRANSLATE_BACKEND", "gemini")
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
-
-    if translate_backend == "gemini" and not gemini_api_key:
-        raise KeyError("GEMINI_API_KEY is required when TRANSLATE_BACKEND=gemini")
+    if not gemini_api_key:
+        raise KeyError("GEMINI_API_KEY is legally required for translation")
 
     return Settings(
         vs_token=os.environ["VS_TOKEN"],
@@ -48,7 +45,6 @@ def load_settings() -> Settings:
         country=os.environ.get("COUNTRY", "all"),
         interval=os.environ.get("INTERVAL", "weekly"),
         duration_threshold_secs=int(os.environ.get("DURATION_THRESHOLD_SECS", "300")),
-        translate_backend=translate_backend,
         gemini_api_key=gemini_api_key,
         translate_top_n=int(os.environ.get("TRANSLATE_TOP_N", "5")),
         feishu_app_id=os.environ["FEISHU_APP_ID"],

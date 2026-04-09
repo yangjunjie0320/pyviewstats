@@ -1,16 +1,14 @@
 # PyViewStats
 
-PyViewStats is an automated monitoring pipeline that fetches video rankings from ViewStats, enriches the data with YouTube metadata (such as video durations), translates the titles using Gemini, and automatically creates comprehensive weekly Feishu documents with inline embedded videos via the `lark-oapi` SDK.
+Automated monitoring pipeline that fetches YouTube video rankings from ViewStats, enriches data (durations, likes), translates titles via Gemini, and automatically publishes weekly Feishu Docx reports with inline embedded short videos.
 
 ## Features
 
-- **ViewStats API Integration**: Automatically fetches the latest top video rankings by category and country.
-- **Data Enrichment**: Scrapes and parses YouTube watch pages to extract accurate video duration data.
-- **Categorization & De-duplication**: Dynamically splits videos into "long" and "short" categories. Uses a persistent Video Registry to ensure videos don't duplicate across weeks.
-- **Automated Translation**: Uses Gemini API to translate video titles.
-- **Feishu Document Automation**: Generates rich interactive Feishu Docx format weekly reports. Automatically downloads short videos via `yt-dlp` and embeds them directly into the document in a side-by-side table layout using the Drive and Docx APIs.
-- **Feishu IM Notifications**: Pushes document links seamlessly to Feishu groups via the Bot API.
-- **Dockerized Environment**: Runs on a scheduled cron configuration using `supercronic` in Docker.
+- **Rankings & Enrichment**: Fetches ViewStats top videos and scrapes YouTube for precise durations.
+- **Auto-Categorization**: Splits videos into long/short and strictly deduplicates them across weeks.
+- **Feishu Document Automation**: Generates Feishu Docx weekly reports, auto-downloading and embedding short videos via `yt-dlp` into side-by-side Table layouts.
+- **Daily IM Notifications**: Sends interactive daily top-N summary cards to Feishu groups.
+- **Dockerized Cron**: Runs scheduled tasks via `supercronic` in Docker.
 
 ## Requirements
 
