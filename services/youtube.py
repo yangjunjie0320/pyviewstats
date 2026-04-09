@@ -1,14 +1,16 @@
-"""YouTube HTML scraper for video duration.
+"""YouTube HTML scraper for video duration and yt-dlp downloader.
 
-Parses `"lengthSeconds":"123"` from the YouTube watch page HTML.
-Uses asyncio.Semaphore(5) for concurrent fetching.
+Duration: parses ``"lengthSeconds":"123"`` from the YouTube watch page HTML.
+Download: uses yt-dlp to download short videos for Feishu doc embedding.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import tempfile
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -53,7 +55,9 @@ class YouTubeDurationFetcher:
 
         try:
             async with self._sem:
-                async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT, follow_redirects=True) as client:
+                async with httpx.AsyncClient(
+                    timeout=_REQUEST_TIMEOUT, follow_redirects=True
+                ) as client:
                     resp = await client.get(
                         f"https://www.youtube.com/watch?v={video_id}",
                         headers=_YT_HEADERS,
@@ -103,3 +107,57 @@ class YouTubeDurationFetcher:
         known = sum(1 for d in durations if d > 0)
         logger.info("Durations fetched: %d/%d known", known, len(entries))
         return enriched
+
+
+class YouTubeVideoDownloader:
+    """Downloads YouTube videos using yt-dlp for Feishu doc embedding."""
+
+    def __init__(self) -> None:
+        self._sem = asyncio.Semaphore(3)
+
+    async def download_video(self, video_id: str) -> str | None:
+        """Download a YouTube video to a temp file. Returns file path or None."""
+        async with self._sem:
+            return await asyncio.to_thread(self._download_sync, video_id)
+
+    @staticmethod
+    def _download_sync(video_id: str) -> str | None:
+        """Synchronous download using yt-dlp."""
+        try:
+            import yt_dlp
+        except ImportError:
+            logger.error("yt-dlp not installed, cannot download videos")
+            return None
+
+        output_dir = tempfile.mkdtemp(prefix="viewstats_")
+        output_template = os.path.join(output_dir, f"{video_id}.%(ext)s")
+
+        ydl_opts = {
+            "format": "best[height<=720][ext=mp4]/best[height<=720]/best",
+            "outtmpl": output_template,
+            "quiet": True,
+            "no_warnings": True,
+            "merge_output_format": "mp4",
+            "socket_timeout": 30,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
+
+            for fname in os.listdir(output_dir):
+                fpath = os.path.join(output_dir, fname)
+                if os.path.isfile(fpath):
+                    logger.info(
+                        "Downloaded video %s (%d bytes)",
+                        video_id,
+                        os.path.getsize(fpath),
+                    )
+                    return fpath
+
+            logger.warning("No file found after download for %s", video_id)
+            return None
+
+        except Exception:
+            logger.warning("Failed to download video %s", video_id, exc_info=True)
+            return None

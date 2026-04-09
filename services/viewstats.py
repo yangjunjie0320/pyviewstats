@@ -113,6 +113,11 @@ class ViewStatsClient:
         for item in raw_list:
             raw = item.get("video", item)
             channel_info = item.get("channel", {})
+            upload_date_raw = raw.get("uploadDate")
+            upload_date = (
+                upload_date_raw[:10] if upload_date_raw else None
+            )
+
             entries.append(
                 VideoEntry(
                     rank=item.get("rank", 0),
@@ -123,6 +128,9 @@ class ViewStatsClient:
                     outlier_score=raw.get("outlierScore"),
                     duration_secs=None,
                     translated_title=None,
+                    upload_date=upload_date,
+                    like_count=raw.get("likeCount"),
+                    comment_count=raw.get("commentCount"),
                 )
             )
 

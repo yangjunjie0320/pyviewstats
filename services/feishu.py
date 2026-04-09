@@ -1,24 +1,30 @@
-"""Feishu card builder and webhook notifier.
+"""Feishu card builder and message sender via lark-oapi SDK.
 
-Sends interactive cards to Feishu bot webhook. Deduplicates pushes by
-hashing the top-5 video IDs.
+Sends interactive ranking cards to Feishu chats using the IM v1 API.
+All threshold/top-N values are dynamic — no hardcoded text.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-import httpx
+import lark_oapi as lark
+from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
 from models import RankingResult, VideoEntry
 
 if TYPE_CHECKING:
-    import diskcache
+    from config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+# ── Formatters ────────────────────────────────────────────────────────
 
 
 def _fmt_views_cn(n: int) -> str:
@@ -70,6 +76,9 @@ def _fmt_outlier(score: float | None) -> str:
     return f"普通({score:.1f})"
 
 
+# ── Card builders ─────────────────────────────────────────────────────
+
+
 def _render_list_md(entries: list[VideoEntry]) -> str:
     """Build lark_md ordered list for a set of video entries."""
     if not entries:
@@ -91,7 +100,7 @@ def _render_list_md(entries: list[VideoEntry]) -> str:
     return "\n".join(lines)
 
 
-def _build_card_payload(
+def _build_card_content(
     result: RankingResult,
     *,
     category_name: str,
@@ -101,33 +110,42 @@ def _build_card_payload(
     total_views: int,
     dur_known: int,
     source_url: str = "",
-) -> dict:
-    """Construct Feishu interactive card payload."""
+    threshold_secs: int = 300,
+) -> str:
+    """Construct Feishu interactive card content as JSON string.
+
+    The card body is returned as JSON suitable for ``msg_type="interactive"``
+    via the IM v1 message create API.
+    """
     avg_views = total_views // total_count if total_count > 0 else 0
+    threshold_mins = threshold_secs // 60
 
     summary = (
         f"**{category_name}** / {country} / {interval}\n"
         f"共 **{total_count}** 个视频  ·  总播放 **{_fmt_views_cn(total_views)}**"
         f"  ·  均播放 **{_fmt_views_cn(avg_views)}**\n"
-        f"长视频(≥5min): **{len(result.long_videos)}**  ·  "
-        f"短视频(<5min): **{len(result.short_videos)}**  ·  "
+        f"长视频(≥{threshold_mins}min): **{len(result.long_videos)}**  ·  "
+        f"短视频(<{threshold_mins}min): **{len(result.short_videos)}**  ·  "
         f"时长已知: {dur_known}/{total_count}"
     )
 
     long_md = _render_list_md(list(result.long_videos))
     short_md = _render_list_md(list(result.short_videos))
 
+    n_long = len(result.long_videos)
+    n_short = len(result.short_videos)
+
     elements = [
-        {
-            "tag": "div",
-            "text": {"tag": "lark_md", "content": summary},
-        },
+        {"tag": "div", "text": {"tag": "lark_md", "content": summary}},
         {"tag": "hr"},
         {
             "tag": "div",
             "text": {
                 "tag": "lark_md",
-                "content": f"🎬 **长视频 Top 5 (≥5分钟)**\n{long_md}",
+                "content": (
+                    f"🎬 **长视频 Top {n_long} "
+                    f"(≥{threshold_mins}分钟)**\n{long_md}"
+                ),
             },
         },
         {"tag": "hr"},
@@ -135,52 +153,56 @@ def _build_card_payload(
             "tag": "div",
             "text": {
                 "tag": "lark_md",
-                "content": f"🩳 **短视频 Top 5 (<5分钟)**\n{short_md}",
+                "content": (
+                    f"🩳 **短视频 Top {n_short} "
+                    f"(<{threshold_mins}分钟)**\n{short_md}"
+                ),
             },
         },
     ]
 
-    # Add source URL and timestamp footer
-    footer_text = []
+    # Footer with source link and timestamp
+    footer_parts: list[str] = []
     if source_url:
-        footer_text.append(f"🔗 [查看完整榜单]({source_url})")
-    
-    # Add current timestamp
+        footer_parts.append(f"🔗 [查看完整榜单]({source_url})")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    footer_text.append(f"🕒 获取时间: {now_str}")
+    footer_parts.append(f"🕒 获取时间: {now_str}")
 
     elements.append({"tag": "hr"})
     elements.append(
         {
             "tag": "div",
-            "text": {
-                "tag": "lark_md",
-                "content": "  ·  ".join(footer_text),
-            },
+            "text": {"tag": "lark_md", "content": "  ·  ".join(footer_parts)},
         }
     )
 
-    return {
-        "msg_type": "interactive",
-        "card": {
-            "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"📊 ViewStats {category_name} 周报",
-                },
-                "template": "blue",
+    card = {
+        "header": {
+            "title": {
+                "tag": "plain_text",
+                "content": f"📊 ViewStats {category_name} 日报",
             },
-            "elements": elements,
+            "template": "blue",
         },
+        "elements": elements,
     }
+    return json.dumps(card, ensure_ascii=False)
+
+
+# ── Notifier ──────────────────────────────────────────────────────────
 
 
 class FeishuNotifier:
-    """Sends ranking cards to Feishu webhook with deduplication."""
+    """Sends ranking cards to a Feishu chat via lark-oapi IM API."""
 
-    def __init__(self, webhook_url: str, cache: diskcache.Cache) -> None:
-        self._webhook_url = webhook_url
-        self._cache = cache
+    def __init__(self, settings: Settings) -> None:
+        self._client = (
+            lark.Client.builder()
+            .app_id(settings.feishu_app_id)
+            .app_secret(settings.feishu_app_secret)
+            .build()
+        )
+        self._chat_id = settings.feishu_chat_id
 
     async def send_ranking_card(
         self,
@@ -193,9 +215,10 @@ class FeishuNotifier:
         total_views: int = 0,
         dur_known: int = 0,
         source_url: str = "",
+        threshold_secs: int = 300,
     ) -> None:
         """Build and send the ranking card."""
-        payload = _build_card_payload(
+        content = _build_card_content(
             result,
             category_name=category_name,
             country=country,
@@ -204,33 +227,36 @@ class FeishuNotifier:
             total_views=total_views,
             dur_known=dur_known,
             source_url=source_url,
+            threshold_secs=threshold_secs,
         )
 
-        logger.info("Sending Feishu card")
+        logger.info("Sending Feishu card to chat %s", self._chat_id)
 
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                self._webhook_url,
-                json=payload,
+        request = (
+            CreateMessageRequest.builder()
+            .receive_id_type("chat_id")
+            .request_body(
+                CreateMessageRequestBody.builder()
+                .receive_id(self._chat_id)
+                .msg_type("interactive")
+                .content(content)
+                .build()
             )
-            body = resp.text
+            .build()
+        )
 
-            if resp.status_code != 200:
-                logger.error(
-                    "Feishu webhook returned %d: %s", resp.status_code, body[:500]
-                )
-                raise RuntimeError(
-                    f"Feishu webhook error: HTTP {resp.status_code}: {body[:500]}"
-                )
+        response = await asyncio.to_thread(
+            self._client.im.v1.message.create, request
+        )
 
-            try:
-                resp_json = resp.json()
-                code = resp_json.get("code")
-                if code is not None and code != 0:
-                    logger.error("Feishu API returned error: %s", body[:500])
-                    raise RuntimeError(f"Feishu API error: {body[:500]}")
-            except Exception as e:
-                if isinstance(e, RuntimeError):
-                    raise
+        if not response.success():
+            logger.error(
+                "Feishu IM API error: code=%d msg=%s",
+                response.code,
+                response.msg,
+            )
+            raise RuntimeError(
+                f"Feishu IM API error: code={response.code} msg={response.msg}"
+            )
 
-            logger.info("Feishu card sent successfully: %s", body[:200])
+        logger.info("Feishu card sent successfully")

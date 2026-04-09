@@ -17,7 +17,6 @@ class Settings:
     """Immutable application settings."""
 
     vs_token: str
-    feishu_bot_url: str
     category_id: int
     country: str
     interval: str
@@ -25,6 +24,12 @@ class Settings:
     translate_backend: str
     gemini_api_key: str | None
     translate_top_n: int
+    # Feishu SDK credentials (required)
+    feishu_app_id: str
+    feishu_app_secret: str
+    feishu_chat_id: str
+    # Feishu doc archival (optional)
+    feishu_folder_token: str | None
 
 
 def load_settings() -> Settings:
@@ -34,13 +39,11 @@ def load_settings() -> Settings:
     translate_backend = os.environ.get("TRANSLATE_BACKEND", "gemini")
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
 
-    # Validate: if gemini backend is selected, key is required
     if translate_backend == "gemini" and not gemini_api_key:
         raise KeyError("GEMINI_API_KEY is required when TRANSLATE_BACKEND=gemini")
 
     return Settings(
         vs_token=os.environ["VS_TOKEN"],
-        feishu_bot_url=os.environ["FEISHU_BOT_URL"],
         category_id=int(os.environ.get("CATEGORY_ID", "0")),
         country=os.environ.get("COUNTRY", "all"),
         interval=os.environ.get("INTERVAL", "weekly"),
@@ -48,4 +51,8 @@ def load_settings() -> Settings:
         translate_backend=translate_backend,
         gemini_api_key=gemini_api_key,
         translate_top_n=int(os.environ.get("TRANSLATE_TOP_N", "5")),
+        feishu_app_id=os.environ["FEISHU_APP_ID"],
+        feishu_app_secret=os.environ["FEISHU_APP_SECRET"],
+        feishu_chat_id=os.environ["FEISHU_CHAT_ID"],
+        feishu_folder_token=os.environ.get("FEISHU_FOLDER_TOKEN"),
     )

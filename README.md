@@ -1,23 +1,24 @@
 # PyViewStats
 
-PyViewStats is an automated monitoring pipeline that fetches video rankings from ViewStats, enriches the data with YouTube metadata (such as video durations), translates the titles using Google Translate or Gemini (LLM), and sends the formatted results via Feishu interactive bot cards.
+PyViewStats is an automated monitoring pipeline that fetches video rankings from ViewStats, enriches the data with YouTube metadata (such as video durations), translates the titles using Gemini, and automatically creates comprehensive weekly Feishu documents with inline embedded videos via the `lark-oapi` SDK.
 
 ## Features
 
 - **ViewStats API Integration**: Automatically fetches the latest top video rankings by category and country.
 - **Data Enrichment**: Scrapes and parses YouTube watch pages to extract accurate video duration data.
-- **Categorization**: Dynamically splits videos into "long" and "short" categories based on customizable duration thresholds.
-- **Automated Translation**: Uses Google Translate or Gemini to translate video titles.
-- **Feishu Bot Integration**: Delivers stunning interactive bot cards directly to a Feishu group.
-- **Dockerized Cron Job**: Runs automatically using Docker & `crontab`.
+- **Categorization & De-duplication**: Dynamically splits videos into "long" and "short" categories. Uses a persistent Video Registry to ensure videos don't duplicate across weeks.
+- **Automated Translation**: Uses Gemini API to translate video titles.
+- **Feishu Document Automation**: Generates rich interactive Feishu Docx format weekly reports. Automatically downloads short videos via `yt-dlp` and embeds them directly into the document in a side-by-side table layout using the Drive and Docx APIs.
+- **Feishu IM Notifications**: Pushes document links seamlessly to Feishu groups via the Bot API.
+- **Dockerized Environment**: Runs on a scheduled cron configuration using `supercronic` in Docker.
 
 ## Requirements
 
-- Python 3.10+
-- Docker & Docker Compose (optional but recommended for deployment)
-- Feishu Custom Bot Webhook URL
+- Python 3.12+
+- Docker & Docker Compose
+- Feishu API Application setup (App ID, App Secret, Folder Token, Chat ID)
 - ViewStats API Token
-- Gemini API Key (Optional, if using Gemini as translation backend)
+- Gemini API Key
 
 ## Configuration
 
@@ -30,14 +31,15 @@ cp .env.example .env
 Key environment variables:
 
 - `VS_TOKEN`: ViewStats API token.
-- `FEISHU_BOT_URL`: Webhook URL for the Feishu Custom Bot.
+- `FEISHU_APP_ID`: Feishu ISV / Internal application ID.
+- `FEISHU_APP_SECRET`: Feishu application secret key.
+- `FEISHU_CHAT_ID`: Destination Chat/Group ID where document links will be sent.
+- `FEISHU_FOLDER_TOKEN`: Feishu Drive Folder token where weekly documents will be stored.
 - `CATEGORY_ID`: YouTube category ID (default: 0 for all).
 - `COUNTRY`: ViewStats country code (default: all).
-- `INTERVAL`: Time interval for rankings (default: weekly).
 - `DURATION_THRESHOLD_SECS`: Threshold to divide short vs long videos (default: 300).
-- `TRANSLATE_BACKEND`: `gemini` or `google` (default: gemini).
-- `GEMINI_API_KEY`: Required if using `gemini` backend.
-- `TRANSLATE_TOP_N`: Number of top videos from each category to translate (default: 5).
+- `GEMINI_API_KEY`: Google Gemini API Key for translations.
+- `TRANSLATE_TOP_N`: Number of top videos from each category to translate (default: 5 short / 5 long).
 
 ## Getting Started
 

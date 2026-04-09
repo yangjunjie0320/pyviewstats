@@ -17,6 +17,9 @@ class VideoEntry:
     outlier_score: float | None = None
     duration_secs: int | None = None
     translated_title: str | None = None
+    upload_date: str | None = None
+    like_count: int | None = None
+    comment_count: int | None = None
 
 
 @dataclass(frozen=True)

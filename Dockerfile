@@ -2,10 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install supercronic
+# Install supercronic and ffmpeg (needed by yt-dlp for merging streams)
 ARG SUPERCRONIC_VERSION=0.2.33
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && apt-get install -y --no-install-recommends curl ca-certificates ffmpeg \
     && ARCH=$(dpkg --print-architecture) \
     && curl -fsSL "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-${ARCH}" \
        -o /usr/local/bin/supercronic \
@@ -27,7 +27,7 @@ COPY crontab /app/crontab
 # Ensure crontab has Unix line endings
 RUN sed -i 's/\r$//' /app/crontab
 
-# Create cache directory
-RUN mkdir -p /app/.cache
+# Create cache and temp directories
+RUN mkdir -p /app/.cache /tmp/viewstats
 
 CMD ["supercronic", "/app/crontab"]
