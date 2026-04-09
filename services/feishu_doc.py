@@ -43,55 +43,18 @@ from lark_oapi.api.drive.v1 import (
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
 from models import VideoEntry
+from utils.formatters import (
+    format_count,
+    format_duration,
+    format_outlier,
+    format_views,
+)
 
 if TYPE_CHECKING:
     import diskcache
     from config import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# ── Formatters ────────────────────────────────────────────────────────
-
-
-def _fmt_views(n: int) -> str:
-    if n <= 0:
-        return "0"
-    if n >= 1_0000_0000:
-        return f"{n / 1_0000_0000:.1f}亿"
-    if n >= 1_0000:
-        return f"{n / 1_0000:.1f}万"
-    return f"{n:,}"
-
-
-def _fmt_count(n: int | None) -> str:
-    """Format like/comment counts."""
-    if n is None:
-        return "-"
-    return _fmt_views(n)
-
-
-def _fmt_duration(seconds: int | None) -> str:
-    if not seconds or seconds <= 0:
-        return "-"
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    return f"{h}:{m:02d}:{s:02d}" if h > 0 else f"{m}:{s:02d}"
-
-
-def _fmt_outlier(score: float | None) -> str:
-    if score is None:
-        return "暂无"
-    if score >= 100:
-        return f"🔥🔥 现象级 ({score:.1f}x)"
-    if score >= 10:
-        return f"🔥 爆款 ({score:.1f}x)"
-    if score >= 3:
-        return f"⭐ 优秀 ({score:.1f}x)"
-    if score >= 1:
-        return f"👍 不错 ({score:.1f}x)"
-    return f"普通 ({score:.1f}x)"
 
 
 # ── Block builders ────────────────────────────────────────────────────
@@ -188,7 +151,7 @@ class FeishuDocArchiver:
             _text_block(
                 f"📂 分类: {category_name}\n"
                 f"📅 周期: {week_key}\n"
-                f"🎯 总视频数: {total}  |  总播放量: {_fmt_views(total_views)}\n"
+                f"🎯 总视频数: {total}  |  总播放量: {format_views(total_views)}\n"
                 f"🎬 长视频 (>={threshold_mins}min): {len(long_videos)}\n"
                 f"🩳 短视频 (<{threshold_mins}min): {len(short_videos)}"
             ),
@@ -495,11 +458,11 @@ class FeishuDocArchiver:
             ),
             # Info line 2: stats
             _text_block(
-                f"▶️ 播放: {_fmt_views(entry.views)}  |  "
-                f"⏱ 时长: {_fmt_duration(entry.duration_secs)}  |  "
-                f"📊 离群值: {_fmt_outlier(entry.outlier_score)}\n"
-                f"👍 点赞: {_fmt_count(entry.like_count)}  |  "
-                f"💬 评论: {_fmt_count(entry.comment_count)}"
+                f"▶️ 播放: {format_views(entry.views)}  |  "
+                f"⏱ 时长: {format_duration(entry.duration_secs)}  |  "
+                f"📊 离群值: {format_outlier(entry.outlier_score)}\n"
+                f"👍 点赞: {format_count(entry.like_count)}  |  "
+                f"💬 评论: {format_count(entry.comment_count)}"
                 + (f"  |  📅 上传: {entry.upload_date[:10]}" if entry.upload_date else "")
             ),
         ]

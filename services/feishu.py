@@ -17,63 +17,17 @@ import lark_oapi as lark
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
 from models import RankingResult, VideoEntry
+from utils.formatters import (
+    format_duration,
+    format_outlier,
+    format_views,
+    strip_symbols,
+)
 
 if TYPE_CHECKING:
     from config import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# ── Formatters ────────────────────────────────────────────────────────
-
-
-def _fmt_views_cn(n: int) -> str:
-    """Format view count in Chinese style (万/亿)."""
-    if n <= 0:
-        return "0"
-    if n >= 1_0000_0000:
-        return f"{n / 1_0000_0000:.1f}亿"
-    if n >= 1_0000:
-        return f"{n / 1_0000:.1f}万"
-    return f"{n:,}"
-
-
-def _fmt_duration(seconds: int | None) -> str:
-    """Format seconds as mm:ss or hh:mm:ss."""
-    if not seconds or seconds <= 0:
-        return "-"
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    if h > 0:
-        return f"{h}:{m:02d}:{s:02d}"
-    return f"{m}:{s:02d}"
-
-
-def _strip_symbols(text: str) -> str:
-    """Remove emojis, markdown symbols, and excessive whitespace."""
-    text = re.sub(r"[\U0001F000-\U0001FFFF]", "", text)
-    text = re.sub(r"[\u2600-\u27BF]", "", text)
-    text = re.sub(r"[\uFE00-\uFE0F]", "", text)
-    text = re.sub(r"[\u200D\u20E3\uFE0F]", "", text)
-    text = re.sub(r"[*_~`#|]", "", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def _fmt_outlier(score: float | None) -> str:
-    """Convert outlier score to a qualitative label with numeric value."""
-    if score is None:
-        return "暂无数据"
-    if score >= 100:
-        return f"现象级({score:.1f})"
-    if score >= 10:
-        return f"爆款({score:.1f})"
-    if score >= 3:
-        return f"优秀({score:.1f})"
-    if score >= 1:
-        return f"不错({score:.1f})"
-    return f"普通({score:.1f})"
 
 
 # ── Card builders ─────────────────────────────────────────────────────
@@ -87,10 +41,10 @@ def _render_list_md(entries: list[VideoEntry]) -> str:
     lines = []
     for i, entry in enumerate(entries, 1):
         link = f"https://youtu.be/{entry.video_id}"
-        title = entry.translated_title or _strip_symbols(entry.title)
-        views = _fmt_views_cn(entry.views)
-        dur = _fmt_duration(entry.duration_secs)
-        outlier = _fmt_outlier(entry.outlier_score)
+        title = entry.translated_title or strip_symbols(entry.title)
+        views = format_views(entry.views)
+        dur = format_duration(entry.duration_secs)
+        outlier = format_outlier(entry.outlier_score)
 
         lines.append(
             f"{i}. **{entry.channel}** — [{title}]({link})\n"
@@ -122,8 +76,8 @@ def _build_card_content(
 
     summary = (
         f"**{category_name}** / {country} / {interval}\n"
-        f"共 **{total_count}** 个视频  ·  总播放 **{_fmt_views_cn(total_views)}**"
-        f"  ·  均播放 **{_fmt_views_cn(avg_views)}**\n"
+        f"共 **{total_count}** 个视频  ·  总播放 **{format_views(total_views)}**"
+        f"  ·  均播放 **{format_views(avg_views)}**\n"
         f"长视频(≥{threshold_mins}min): **{len(result.long_videos)}**  ·  "
         f"短视频(<{threshold_mins}min): **{len(result.short_videos)}**  ·  "
         f"时长已知: {dur_known}/{total_count}"
