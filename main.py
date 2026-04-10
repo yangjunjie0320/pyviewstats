@@ -123,11 +123,7 @@ async def main() -> None:
     # Write translated titles back to weekly buffer
     registry.update_entries(long_videos + short_videos)
 
-    # ── Step 6: Pre-download short videos (throttled + retry) ────────
-    downloader = YouTubeVideoDownloader(cache)
-    await downloader.predownload_videos(short_videos)
-
-    # ── Step 7: Send daily card (top-N only) ───────────────────────
+    # ── Step 6: Send daily card immediately (top-N only) ────────────
     result = RankingResult(
         long_videos=tuple(long_videos[:top_n]),
         short_videos=tuple(short_videos[:top_n]),
@@ -155,6 +151,10 @@ async def main() -> None:
         source_url=source_url,
         threshold_secs=threshold,
     )
+
+    # ── Step 7: Pre-download short videos (throttled, after card) ─────
+    downloader = YouTubeVideoDownloader(cache)
+    await downloader.predownload_videos(short_videos)
 
     # ── Step 8: Weekly document generation ────────────────────────
     if settings.feishu_folder_token:
