@@ -110,15 +110,122 @@ class YouTubeDurationFetcher:
 
 
 class YouTubeVideoDownloader:
-    """Downloads YouTube videos using yt-dlp for Feishu doc embedding."""
+    """Downloads YouTube videos using yt-dlp for Feishu doc embedding.
 
-    def __init__(self) -> None:
-        self._sem = asyncio.Semaphore(3)
+    Supports two modes:
+      - predownload_videos(): daily throttled pre-download with retry, stores
+        video bytes into diskcache for later use.
+      - get_cached_video(): retrieve pre-downloaded video from cache, write to
+        a temp file, return path.  Falls back to live download if not cached.
+    """
+
+    _VIDEO_CACHE_TTL = 14 * 24 * 3600  # 14 days
+    _DEFAULT_DELAY = 10  # seconds between downloads
+    _MAX_RETRIES = 3
+
+    def __init__(self, cache: diskcache.Cache | None = None) -> None:
+        self._cache = cache
+
+    # ── Daily pre-download (throttled + retry) ────────────────────────
+
+    async def predownload_videos(
+        self, entries: list[VideoEntry], *, delay: int = _DEFAULT_DELAY
+    ) -> int:
+        """Pre-download short videos serially with throttling and retry.
+
+        Stores raw file bytes in diskcache.  Skips already-cached videos.
+        Returns count of newly downloaded videos.
+        """
+        if not self._cache:
+            logger.warning("No cache configured, skipping predownload")
+            return 0
+
+        downloaded = 0
+        for entry in entries:
+            cache_key = f"video_file:{entry.video_id}"
+            if self._cache.get(cache_key) is not None:
+                logger.debug("Video %s already cached, skipping", entry.video_id)
+                continue
+
+            success = await self._download_with_retry(entry.video_id, delay)
+            if success:
+                downloaded += 1
+
+            # Throttle between downloads regardless of success
+            await asyncio.sleep(delay)
+
+        logger.info(
+            "Pre-download complete: %d/%d newly cached", downloaded, len(entries)
+        )
+        return downloaded
+
+    async def _download_with_retry(self, video_id: str, base_delay: int) -> bool:
+        """Download a video with exponential backoff retry."""
+        for attempt in range(self._MAX_RETRIES):
+            file_path = await asyncio.to_thread(self._download_sync, video_id)
+            if file_path:
+                try:
+                    with open(file_path, "rb") as f:
+                        video_bytes = f.read()
+                    self._cache.set(
+                        f"video_file:{video_id}",
+                        video_bytes,
+                        expire=self._VIDEO_CACHE_TTL,
+                    )
+                    logger.info(
+                        "Cached video %s (%d bytes)", video_id, len(video_bytes)
+                    )
+                    return True
+                finally:
+                    try:
+                        os.unlink(file_path)
+                        parent = os.path.dirname(file_path)
+                        if parent and not os.listdir(parent):
+                            os.rmdir(parent)
+                    except OSError:
+                        pass
+
+            # Exponential backoff: base_delay * 2^attempt
+            wait = base_delay * (2 ** attempt)
+            logger.warning(
+                "Download attempt %d/%d failed for %s, retrying in %ds",
+                attempt + 1, self._MAX_RETRIES, video_id, wait,
+            )
+            await asyncio.sleep(wait)
+
+        logger.error(
+            "All %d download attempts failed for %s", self._MAX_RETRIES, video_id
+        )
+        return False
+
+    # ── Cache-first retrieval (for weekly doc) ────────────────────────
+
+    def get_cached_video(self, video_id: str) -> str | None:
+        """Retrieve a pre-downloaded video from cache as a temp file.
+
+        Returns file path or None if not cached.
+        """
+        if not self._cache:
+            return None
+        video_bytes = self._cache.get(f"video_file:{video_id}")
+        if video_bytes is None:
+            return None
+
+        output_dir = tempfile.mkdtemp(prefix="viewstats_")
+        fpath = os.path.join(output_dir, f"{video_id}.mp4")
+        with open(fpath, "wb") as f:
+            f.write(video_bytes)
+        logger.debug("Restored cached video %s (%d bytes)", video_id, len(video_bytes))
+        return fpath
+
+    # ── Live download (fallback) ──────────────────────────────────────
 
     async def download_video(self, video_id: str) -> str | None:
-        """Download a YouTube video to a temp file. Returns file path or None."""
-        async with self._sem:
-            return await asyncio.to_thread(self._download_sync, video_id)
+        """Download a YouTube video. Tries cache first, falls back to live."""
+        cached = self.get_cached_video(video_id)
+        if cached:
+            return cached
+        return await asyncio.to_thread(self._download_sync, video_id)
 
     @staticmethod
     def _download_sync(video_id: str) -> str | None:

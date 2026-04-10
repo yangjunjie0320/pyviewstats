@@ -267,7 +267,7 @@ class FeishuDocArchiver:
         Then a divider below the table.
         """
         from services.youtube import YouTubeVideoDownloader
-        downloader = YouTubeVideoDownloader()
+        downloader = YouTubeVideoDownloader(self._cache)
 
         for i, entry in enumerate(short_videos, 1):
             file_path: str | None = None

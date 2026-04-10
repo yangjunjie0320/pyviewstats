@@ -95,3 +95,24 @@ class VideoRegistry:
             week_key,
             len(archived),
         )
+
+    def update_entries(self, entries: list[VideoEntry]) -> None:
+        """Update buffer entries with enriched data (e.g. translated titles).
+
+        Merges updated fields into existing buffer entries for the current week.
+        """
+        week_key = self.get_week_key()
+        buffer_key = f"registry:buffer:{week_key}"
+        buffer: dict[str, dict] = self._cache.get(buffer_key) or {}
+
+        updated = 0
+        for entry in entries:
+            if entry.video_id in buffer:
+                buffer[entry.video_id] = asdict(entry)
+                updated += 1
+
+        if updated:
+            self._cache.set(buffer_key, buffer)
+            logger.info(
+                "Updated %d entries in buffer %s", updated, week_key
+            )

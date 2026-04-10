@@ -3,8 +3,8 @@
 Single entrypoint. Only file that imports across service boundaries.
 Do NOT wrap the pipeline in broad try/except.
 
-Daily flow:  fetch → enrich → split → translate top-N → send card → buffer for weekly doc
-Weekly flow: translate all → download short videos → create Feishu document
+Daily flow:  fetch → enrich → buffer → translate ALL → pre-download shorts → send card
+Weekly flow: read pre-translated buffer → use cached videos → assemble Feishu doc
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from services.feishu_doc import FeishuDocArchiver
 from services.translator import GeminiTranslator
 from services.video_registry import VideoRegistry
 from services.viewstats import ViewStatsClient
-from services.youtube import YouTubeDurationFetcher
+from services.youtube import YouTubeDurationFetcher, YouTubeVideoDownloader
 from utils.cache import get_cache
 from utils.logging import configure_logging
 
@@ -112,21 +112,25 @@ async def main() -> None:
         threshold,
     )
 
-    # ── Step 5: Translate top N for daily card ────────────────────────
+    # ── Step 5: Translate ALL videos for buffer + daily card ─────────
     translator = GeminiTranslator(settings.gemini_api_key, cache)
 
-    long_top = long_videos[:top_n]
-    short_top = short_videos[:top_n]
+    if long_videos:
+        long_videos = await translator.translate_entries(long_videos)
+    if short_videos:
+        short_videos = await translator.translate_entries(short_videos)
 
-    if long_top:
-        long_top = await translator.translate_entries(long_top)
-    if short_top:
-        short_top = await translator.translate_entries(short_top)
+    # Write translated titles back to weekly buffer
+    registry.update_entries(long_videos + short_videos)
 
-    # ── Step 6: Send daily card ───────────────────────────────────────
+    # ── Step 6: Pre-download short videos (throttled + retry) ────────
+    downloader = YouTubeVideoDownloader(cache)
+    await downloader.predownload_videos(short_videos)
+
+    # ── Step 7: Send daily card (top-N only) ───────────────────────
     result = RankingResult(
-        long_videos=tuple(long_top),
-        short_videos=tuple(short_top),
+        long_videos=tuple(long_videos[:top_n]),
+        short_videos=tuple(short_videos[:top_n]),
     )
 
     total_views = sum(e.views for e in entries)
@@ -152,7 +156,7 @@ async def main() -> None:
         threshold_secs=threshold,
     )
 
-    # ── Step 7: Weekly document generation ────────────────────────────
+    # ── Step 8: Weekly document generation ────────────────────────
     if settings.feishu_folder_token:
         prev_week = registry.get_previous_week_key()
 
@@ -169,7 +173,7 @@ async def main() -> None:
                 # Re-enrich durations (most will be cached)
                 week_entries = await yt_fetcher.enrich_durations(week_entries)
 
-                # Split
+                # Split (translations are already in buffer from daily runs)
                 week_long = sorted(
                     [e for e in week_entries if (e.duration_secs or 0) >= threshold],
                     key=lambda e: e.views,
@@ -181,13 +185,13 @@ async def main() -> None:
                     reverse=True,
                 )
 
-                # Translate ALL titles for the document
+                # Translate any entries still missing translations
                 if week_long:
                     week_long = await translator.translate_entries(week_long)
                 if week_short:
                     week_short = await translator.translate_entries(week_short)
 
-                # Create the document (downloads + embeds short videos)
+                # Create the document (uses pre-cached videos)
                 archiver = FeishuDocArchiver(settings, cache)
                 await archiver.archive_weekly_report(
                     week_long,
