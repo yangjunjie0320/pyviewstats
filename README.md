@@ -6,7 +6,8 @@ Automated monitoring pipeline that fetches YouTube video rankings from ViewStats
 
 - **Rankings & Enrichment**: Fetches ViewStats top videos and scrapes YouTube for precise durations.
 - **Auto-Categorization**: Splits videos into long/short and strictly deduplicates them across weeks.
-- **Feishu Document Automation**: Generates Feishu Docx weekly reports, auto-downloading and embedding short videos via `yt-dlp` into side-by-side Table layouts.
+- **Daily Pre-processing**: Translates all video titles and pre-downloads short videos daily with throttling (10s delay + exponential backoff retry), spreading network load evenly.
+- **Feishu Document Automation**: Generates Feishu Docx weekly reports using pre-cached videos, embedding them into side-by-side Table layouts.
 - **Daily IM Notifications**: Sends interactive daily top-N summary cards to Feishu groups.
 - **Dockerized Cron**: Runs scheduled tasks via `supercronic` in Docker.
 
@@ -37,7 +38,7 @@ Key environment variables:
 - `COUNTRY`: ViewStats country code (default: all).
 - `DURATION_THRESHOLD_SECS`: Threshold to divide short vs long videos (default: 300).
 - `GEMINI_API_KEY`: Google Gemini API Key for translations.
-- `TRANSLATE_TOP_N`: Number of top videos from each category to translate (default: 5 short / 5 long).
+- `TRANSLATE_TOP_N`: Number of top videos per group shown in the daily card (default: 5).
 
 ## Getting Started
 
