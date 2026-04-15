@@ -115,6 +115,7 @@ class FeishuDocArchiver:
             lark.Client.builder()
             .app_id(settings.feishu_app_id)
             .app_secret(settings.feishu_app_secret)
+            .timeout(15.0)
             .build()
         )
         self._folder_token = settings.feishu_folder_token
@@ -187,6 +188,55 @@ class FeishuDocArchiver:
         logger.info("Weekly report document completed: %s", doc_id)
         return doc_id
 
+    # Feishu error codes that are safe to retry (transient/rate-limit).
+    _RETRYABLE_CODES: frozenset[int] = frozenset({
+        11232,  # frequency limited
+        11233,  # send frequency limited
+        11234,  # bot send message: frequency limited
+        99991400,  # request too fast
+    })
+
+    async def _execute_api(self, func, *args, **kwargs):
+        """Execute Feishu API call with retry on network and rate-limit errors."""
+        last_err = None
+        max_retries = 3
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                task = asyncio.to_thread(func, *args, **kwargs)
+                # 30 seconds max per API call to prevent socket hang
+                resp = await asyncio.wait_for(task, timeout=30.0)
+                
+                # Check for Feishu business-level rate limiting
+                if hasattr(resp, "success") and not resp.success():
+                    if resp.code in self._RETRYABLE_CODES and attempt < max_retries:
+                        delay = 10 * (2 ** (attempt - 1))
+                        logger.warning(
+                            "Feishu API rate-limited: code=%d msg=%s. Retrying (%d/3) in %ds...", 
+                            resp.code, getattr(resp, "msg", ""), attempt, delay
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                        
+                return resp
+                
+            except asyncio.TimeoutError:
+                last_err = TimeoutError("Feishu API timeout")
+                if attempt < max_retries:
+                    delay = 5 * attempt
+                    logger.warning("Feishu API timeout. Retrying (%d/3) in %ds...", attempt, delay)
+                    await asyncio.sleep(delay)
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries:
+                    delay = 5 * attempt
+                    logger.warning("Feishu API network/SDK error: %s. Retrying (%d/3) in %ds...", e, attempt, delay)
+                    await asyncio.sleep(delay)
+        
+        if last_err:
+            raise last_err
+        raise RuntimeError("Failed to execute Feishu API call after retries")
+
     # ── Document operations ───────────────────────────────────────────
 
     async def _create_document(self, title: str) -> str:
@@ -200,7 +250,7 @@ class FeishuDocArchiver:
             )
             .build()
         )
-        response = await asyncio.to_thread(
+        response = await self._execute_api(
             self._client.docx.v1.document.create, request
         )
         if not response.success():
@@ -237,7 +287,7 @@ class FeishuDocArchiver:
                 )
                 .build()
             )
-            response = await asyncio.to_thread(
+            response = await self._execute_api(
                 self._client.docx.v1.document_block_children.create, request
             )
             if not response.success():
@@ -337,6 +387,9 @@ class FeishuDocArchiver:
                             os.rmdir(parent)
                     except OSError:
                         pass
+                
+                # Throttle requests to prevent Feishu API rate limits and DNS socket exhaustion
+                await asyncio.sleep(2)
 
     async def _upload_media(
         self, parent_block_id: str, file_path: str, video_id: str
@@ -357,7 +410,7 @@ class FeishuDocArchiver:
                 )
                 .build()
             )
-            response = await asyncio.to_thread(
+            response = await self._execute_api(
                 self._client.drive.v1.media.upload_all, request
             )
         if not response.success():
@@ -387,7 +440,7 @@ class FeishuDocArchiver:
             )
             .build()
         )
-        response = await asyncio.to_thread(
+        response = await self._execute_api(
             self._client.docx.v1.document_block.patch, request
         )
         if not response.success():
@@ -429,7 +482,7 @@ class FeishuDocArchiver:
             )
             .build()
         )
-        response = await asyncio.to_thread(
+        response = await self._execute_api(
             self._client.im.v1.message.create, request
         )
         if not response.success():

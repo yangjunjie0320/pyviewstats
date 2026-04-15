@@ -158,6 +158,14 @@ class FeishuNotifier:
         )
         self._chat_id = settings.feishu_chat_id
 
+    # Feishu error codes that are safe to retry (transient/rate-limit).
+    _RETRYABLE_CODES: frozenset[int] = frozenset({
+        11232,  # frequency limited
+        11233,  # send frequency limited
+        11234,  # bot send message: frequency limited
+        99991400,  # request too fast
+    })
+
     async def send_ranking_card(
         self,
         result: RankingResult,
@@ -171,7 +179,7 @@ class FeishuNotifier:
         source_url: str = "",
         threshold_secs: int = 300,
     ) -> None:
-        """Build and send the ranking card."""
+        """Build and send the ranking card with retry on rate-limit errors."""
         content = _build_card_content(
             result,
             category_name=category_name,
@@ -199,11 +207,41 @@ class FeishuNotifier:
             .build()
         )
 
-        response = await asyncio.to_thread(
-            self._client.im.v1.message.create, request
-        )
+        max_retries = 3
+        base_delay = 10  # seconds
 
-        if not response.success():
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await asyncio.to_thread(
+                    self._client.im.v1.message.create, request
+                )
+            except Exception as exc:
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** (attempt - 1))
+                    logger.warning(
+                        "Feishu IM network error: %s. Retrying (%d/%d) in %ds...",
+                        exc, attempt, max_retries, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise
+
+            if response.success():
+                logger.info("Feishu card sent successfully")
+                return
+
+            if response.code in self._RETRYABLE_CODES and attempt < max_retries:
+                delay = base_delay * (2 ** (attempt - 1))
+                logger.warning(
+                    "Feishu IM rate-limited: code=%d msg=%s. "
+                    "Retrying (%d/%d) in %ds...",
+                    response.code, response.msg,
+                    attempt, max_retries, delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            # Non-retryable error or final attempt
             logger.error(
                 "Feishu IM API error: code=%d msg=%s",
                 response.code,
@@ -212,5 +250,3 @@ class FeishuNotifier:
             raise RuntimeError(
                 f"Feishu IM API error: code={response.code} msg={response.msg}"
             )
-
-        logger.info("Feishu card sent successfully")
