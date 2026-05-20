@@ -17,7 +17,7 @@ import lark_oapi as lark
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
 from models import RankingResult, VideoEntry
-from utils.formatters import (
+from src.formatters import (
     format_duration,
     format_outlier,
     format_views,

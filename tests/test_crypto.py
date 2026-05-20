@@ -5,7 +5,7 @@ import json
 import pytest
 from Crypto.Cipher import AES
 
-from utils.crypto import _KEY, _IV, _decode_byte_array, decrypt_payload
+from src.crypto import _KEY, _IV, _decode_byte_array, decrypt_payload
 
 
 class TestDecodeByteArray:

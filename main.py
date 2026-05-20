@@ -24,8 +24,8 @@ from src.translator import GeminiTranslator
 from src.video_registry import VideoRegistry
 from src.viewstats import ViewStatsClient
 from src.youtube import YouTubeDurationFetcher, YouTubeVideoDownloader
-from utils.cache import get_cache
-from utils.logging import configure_logging
+from src.cache import get_cache
+from src.logging import configure_logging
 
 logger = logging.getLogger(__name__)
 

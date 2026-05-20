@@ -43,7 +43,7 @@ from lark_oapi.api.drive.v1 import (
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
 from models import VideoEntry
-from utils.formatters import (
+from src.formatters import (
     format_count,
     format_duration,
     format_outlier,

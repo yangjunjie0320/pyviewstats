@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from models import VideoEntry
-from utils.crypto import decrypt_payload
+from src.crypto import decrypt_payload
 
 if TYPE_CHECKING:
     import diskcache

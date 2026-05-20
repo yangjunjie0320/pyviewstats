@@ -2,7 +2,7 @@
 
 import pytest
 
-from utils.formatters import (
+from src.formatters import (
     format_count,
     format_duration,
     format_outlier,

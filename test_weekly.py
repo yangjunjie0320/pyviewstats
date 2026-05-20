@@ -7,8 +7,8 @@ from src.feishu_doc import FeishuDocArchiver
 from src.translator import GeminiTranslator
 from src.video_registry import VideoRegistry
 from src.youtube import YouTubeDurationFetcher
-from utils.cache import get_cache
-from utils.logging import configure_logging
+from src.cache import get_cache
+from src.logging import configure_logging
 
 async def gen_weekly():
     configure_logging()
