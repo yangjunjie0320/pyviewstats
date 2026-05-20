@@ -44,15 +44,17 @@ Key environment variables:
 
 ### Local Development
 
-1. Create a virtual environment and install dependencies:
+1. Install dependencies with `uv`:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   uv sync
    ```
 2. Run the main pipeline manually:
    ```bash
-   python main.py
+   uv run python main.py
+   ```
+3. Run tests:
+   ```bash
+   uv run pytest tests/ -v
    ```
 
 ### Docker Deployment
@@ -60,10 +62,16 @@ Key environment variables:
 Deploy the system with Docker Compose. It includes a configured crontab to run the pipeline periodically.
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 The container handles cron scheduling using the included `crontab` file to trigger the Python job. Output logs map to `./logs/` by default.
+
+## Development
+
+- **Architecture**: see `DESIGN.md` (local only, not committed to git).
+- **AI collaboration**: see `CLAUDE.md` and `AGENTS.md` (local only).
+- **Tests**: `tests/` directory, run with `uv run pytest`.
 
 ## License
 MIT
