@@ -6,7 +6,7 @@ import diskcache
 import pytest
 
 from models import VideoEntry
-from services.video_registry import VideoRegistry
+from src.video_registry import VideoRegistry
 
 
 @pytest.fixture

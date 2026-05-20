@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py config.py models.py ./
 COPY utils/ ./utils/
-COPY services/ ./services/
+COPY src/ ./src/
 COPY crontab /app/crontab
 
 # Ensure crontab has Unix line endings

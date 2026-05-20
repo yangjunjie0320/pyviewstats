@@ -27,7 +27,7 @@ async def test_send_real_card() -> None:
     """
     from config import load_settings
     from models import RankingResult, VideoEntry
-    from services.feishu import FeishuNotifier
+    from src.feishu import FeishuNotifier
 
     settings = load_settings()
     entry = VideoEntry(

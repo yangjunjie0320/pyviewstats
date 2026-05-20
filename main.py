@@ -18,12 +18,12 @@ sys.path.insert(0, "/app")
 
 from config import load_settings
 from models import RankingResult
-from services.feishu import FeishuNotifier
-from services.feishu_doc import FeishuDocArchiver
-from services.translator import GeminiTranslator
-from services.video_registry import VideoRegistry
-from services.viewstats import ViewStatsClient
-from services.youtube import YouTubeDurationFetcher, YouTubeVideoDownloader
+from src.feishu import FeishuNotifier
+from src.feishu_doc import FeishuDocArchiver
+from src.translator import GeminiTranslator
+from src.video_registry import VideoRegistry
+from src.viewstats import ViewStatsClient
+from src.youtube import YouTubeDurationFetcher, YouTubeVideoDownloader
 from utils.cache import get_cache
 from utils.logging import configure_logging
 
