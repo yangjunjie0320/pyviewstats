@@ -1,0 +1,30 @@
+# ViewStats Monitor — configuration
+# Copy to config.yaml and fill in your values.
+
+# ViewStats API token (required)
+vs_token: ""
+
+# Feishu app credentials (required)
+feishu_app_id: ""
+feishu_app_secret: ""
+feishu_chat_id: ""
+
+# Feishu doc archival (optional, enables weekly document)
+feishu_folder_token: ""
+
+# Feishu tenant domain for document URLs
+feishu_domain: "skyland2020.feishu.cn"
+
+# ViewStats query parameters
+category_id: 0
+country: "all"
+interval: "weekly"
+
+# Long/short video split threshold (seconds)
+duration_threshold_secs: 300
+
+# Google Gemini API Key for translations (required)
+gemini_api_key: ""
+
+# Number of top videos per group in daily card
+translate_top_n: 5

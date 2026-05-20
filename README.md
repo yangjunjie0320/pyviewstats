@@ -21,10 +21,10 @@ Automated monitoring pipeline that fetches YouTube video rankings from ViewStats
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in your details:
+Copy `config.example.yaml` to `config.yaml` and fill in your details:
 
 ```bash
-cp .env.example .env
+cp config.example.yaml config.yaml
 ```
 
 Key environment variables:
