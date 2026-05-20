@@ -120,6 +120,7 @@ class FeishuDocArchiver:
         )
         self._folder_token = settings.feishu_folder_token
         self._chat_id = settings.feishu_chat_id
+        self._feishu_domain = settings.feishu_domain
         self._cache = cache
 
     async def archive_weekly_report(
@@ -461,7 +462,7 @@ class FeishuDocArchiver:
         n_short: int,
     ) -> None:
         """Send the document link as a message to the chat."""
-        doc_url = f"https://skyland2020.feishu.cn/docx/{doc_id}"
+        doc_url = f"https://{self._feishu_domain}/docx/{doc_id}"
         content = json.dumps({
             "text": (
                 f"📄 {title}\n"

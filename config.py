@@ -29,6 +29,8 @@ class Settings:
     feishu_chat_id: str
     # Feishu doc archival (optional)
     feishu_folder_token: str | None
+    # Feishu tenant domain for document URLs
+    feishu_domain: str
 
 
 def load_settings() -> Settings:
@@ -37,7 +39,7 @@ def load_settings() -> Settings:
 
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_api_key:
-        raise KeyError("GEMINI_API_KEY is legally required for translation")
+        raise KeyError("Missing required env var: GEMINI_API_KEY")
 
     return Settings(
         vs_token=os.environ["VS_TOKEN"],
@@ -51,4 +53,5 @@ def load_settings() -> Settings:
         feishu_app_secret=os.environ["FEISHU_APP_SECRET"],
         feishu_chat_id=os.environ["FEISHU_CHAT_ID"],
         feishu_folder_token=os.environ.get("FEISHU_FOLDER_TOKEN"),
+        feishu_domain=os.environ.get("FEISHU_DOMAIN", "skyland2020.feishu.cn"),
     )
