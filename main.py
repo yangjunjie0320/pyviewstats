@@ -16,8 +16,8 @@ import sys
 # Ensure the app directory is on the path for Docker
 sys.path.insert(0, "/app")
 
-from config import load_settings
-from models import RankingResult
+from src.config import load_settings
+from src.models import RankingResult
 from src.feishu import FeishuNotifier
 from src.feishu_doc import FeishuDocArchiver
 from src.translator import GeminiTranslator

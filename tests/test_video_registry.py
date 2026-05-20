@@ -5,7 +5,7 @@ import tempfile
 import diskcache
 import pytest
 
-from models import VideoEntry
+from src.models import VideoEntry
 from src.video_registry import VideoRegistry
 
 

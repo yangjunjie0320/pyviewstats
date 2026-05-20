@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import httpx
 
-from models import VideoEntry
+from src.models import VideoEntry
 
 if TYPE_CHECKING:
     import diskcache

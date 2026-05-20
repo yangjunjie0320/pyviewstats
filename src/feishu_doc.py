@@ -42,7 +42,7 @@ from lark_oapi.api.drive.v1 import (
 )
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
-from models import VideoEntry
+from src.models import VideoEntry
 from src.formatters import (
     format_count,
     format_duration,
@@ -52,7 +52,7 @@ from src.formatters import (
 
 if TYPE_CHECKING:
     import diskcache
-    from config import Settings
+    from src.config import Settings
 
 logger = logging.getLogger(__name__)
 

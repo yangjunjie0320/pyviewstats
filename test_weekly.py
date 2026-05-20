@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 sys.path.insert(0, '/app')
-from config import load_settings
+from src.config import load_settings
 from src.feishu_doc import FeishuDocArchiver
 from src.translator import GeminiTranslator
 from src.video_registry import VideoRegistry

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from models import VideoEntry
+from src.models import VideoEntry
 from src.crypto import decrypt_payload
 
 if TYPE_CHECKING:

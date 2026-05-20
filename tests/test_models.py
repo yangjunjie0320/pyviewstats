@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
-from models import RankingResult, VideoEntry
+from src.models import RankingResult, VideoEntry
 
 
 class TestVideoEntry:

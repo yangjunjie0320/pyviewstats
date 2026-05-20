@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import lark_oapi as lark
 from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
 
-from models import RankingResult, VideoEntry
+from src.models import RankingResult, VideoEntry
 from src.formatters import (
     format_duration,
     format_outlier,
@@ -25,7 +25,7 @@ from src.formatters import (
 )
 
 if TYPE_CHECKING:
-    from config import Settings
+    from src.config import Settings
 
 logger = logging.getLogger(__name__)
 

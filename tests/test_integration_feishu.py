@@ -25,8 +25,8 @@ async def test_send_real_card() -> None:
     - Valid .env with FEISHU_APP_ID, FEISHU_APP_SECRET, FEISHU_CHAT_ID
     - FEISHU_INTEGRATION_SEND=1 in environment
     """
-    from config import load_settings
-    from models import RankingResult, VideoEntry
+    from src.config import load_settings
+    from src.models import RankingResult, VideoEntry
     from src.feishu import FeishuNotifier
 
     settings = load_settings()

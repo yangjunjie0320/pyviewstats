@@ -11,7 +11,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from models import VideoEntry
+from src.models import VideoEntry
 
 if TYPE_CHECKING:
     import diskcache
