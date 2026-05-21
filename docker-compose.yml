@@ -3,7 +3,6 @@ services:
     build: .
     container_name: viewstats-monitor
     init: true
-    env_file: .env
     environment:
       - TZ=Asia/Shanghai
     volumes:
