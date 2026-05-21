@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import lark_oapi as lark
 from lark_oapi.api.docx.v1 import (
@@ -197,7 +197,7 @@ class FeishuDocArchiver:
         99991400,  # request too fast
     })
 
-    async def _execute_api(self, func, *args, **kwargs):
+    async def _execute_api(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Execute Feishu API call with retry on network and rate-limit errors."""
         last_err = None
         max_retries = 3
